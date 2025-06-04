@@ -2,10 +2,10 @@
 
 # Frida Android 隐私监控启动脚本 v3.6
 # 用于快速启动对目标应用的隐私API监控
-# 优化: 使用安全的eval配置解析
+# 优化: 使用安全的eval配置解析，配置化监控脚本
 
 # 配置文件路径
-CONFIG_FILE="config.conf"
+CONFIG_FILE="frida_config.json"
 
 # 默认配置
 DEFAULT_TARGET_PACKAGE="com.frog.educate"
@@ -13,23 +13,29 @@ DEFAULT_LOG_DIR="./logs"
 DEFAULT_LOG_PREFIX="frida_log"
 DEFAULT_AUTO_EXTRACT="true"
 
-# 读取配置文件函数 (使用安全的eval方法)
+# 读取JSON配置文件函数
 load_config() {
     if [ -f "$CONFIG_FILE" ]; then
         echo "⚙️ 读取配置文件: $CONFIG_FILE"
         
-        # 使用eval方法安全解析配置文件
-        while IFS= read -r line; do
-            # 跳过空行和注释行
-            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-            
-            # 验证格式并使用eval设置变量
-            if [[ "$line" =~ ^[A-Z_][A-Z0-9_]*= ]]; then
-                eval "$line"
-            fi
-        done < "$CONFIG_FILE"
+        # 使用jq解析JSON配置文件
+        if command -v jq &> /dev/null; then
+            TARGET_PACKAGE=$(jq -r '.monitor.targetPackage // "com.frog.educate"' "$CONFIG_FILE")
+            LOG_DIR=$(jq -r '.monitor.logDir // "./logs"' "$CONFIG_FILE")
+            LOG_PREFIX=$(jq -r '.monitor.logPrefix // "frida_log"' "$CONFIG_FILE")
+            AUTO_EXTRACT_STACKS=$(jq -r '.monitor.autoExtractStacks // true' "$CONFIG_FILE")
+            PROXY_URL=$(jq -r '.network.proxyUrl // ""' "$CONFIG_FILE")
+        else
+            echo "⚠️ 未找到jq工具，使用简单解析方法"
+            # 简单解析方法（备用）
+            TARGET_PACKAGE=$(grep -o '"targetPackage"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)
+            LOG_DIR=$(grep -o '"logDir"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)
+            LOG_PREFIX=$(grep -o '"logPrefix"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)
+            PROXY_URL=$(grep -o '"proxyUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)
+            AUTO_EXTRACT_STACKS="true"
+        fi
         
-        echo "✅ 配置文件加载完成"
+        echo "✅ JSON配置文件加载完成"
     else
         echo "⚠️ 未找到配置文件 $CONFIG_FILE，使用默认配置"
     fi
@@ -43,8 +49,81 @@ load_config() {
     # 验证必填项
     if [ -z "$TARGET_PACKAGE" ]; then
         echo "❌ 错误: 目标应用包名不能为空"
-        echo "💡 请在 $CONFIG_FILE 中设置 TARGET_PACKAGE=your.app.package"
+        echo "💡 请在 $CONFIG_FILE 中设置 monitor.targetPackage"
         exit 1
+    fi
+}
+
+# 动态生成JS文件函数
+generate_monitor_script() {
+    echo -e "\n🔧 [动态生成] 开始生成监控脚本..."
+    
+    # 确保build目录存在
+    mkdir -p build
+    
+    # 读取配置文件中的API配置
+    local apis_config=""
+    if command -v jq &> /dev/null; then
+        apis_config=$(jq '.apis' "$CONFIG_FILE" 2>/dev/null)
+    else
+        echo -e "${YELLOW}⚠️ 未找到jq工具，使用grep提取配置${NC}"
+        # 简单提取apis部分（备用方案）
+        apis_config=$(sed -n '/\"apis\":/,/],/p' "$CONFIG_FILE" | sed '1s/.*\[/[/' | sed '$s/].*/]/')
+    fi
+    
+    if [ -z "$apis_config" ] || [ "$apis_config" = "null" ]; then
+        echo -e "${RED}❌ 无法提取API配置${NC}"
+        return 1
+    fi
+    
+    # 生成时间戳和文件路径
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    local build_file="build/privacy_monitor_generated.js"
+    local template_file="lib/privacy_monitor_template.js"
+    
+    # 检查模板文件是否存在
+    if [ ! -f "$template_file" ]; then
+        echo -e "${RED}❌ 模板文件不存在: $template_file${NC}"
+        return 1
+    fi
+    
+    echo -e "${BLUE}📝 基于模板: ${template_file}${NC}"
+    echo -e "${BLUE}📝 生成文件: ${build_file}${NC}"
+    
+    # 复制模板文件
+    cp "$template_file" "$build_file"
+    
+    # 添加生成信息注释
+    sed -i '' '1i\
+// 自动生成的Frida隐私监控脚本\
+// 生成时间: '"$timestamp"'\
+// 配置文件: '"$CONFIG_FILE"'\
+// 目标应用: '"$TARGET_PACKAGE"'\
+// 基于模板: '"$template_file"'\
+' "$build_file"
+    
+    # 替换配置占位符 - 拼接完整变量声明
+    # 第一步：替换为临时标记
+    sed -i '' 's/var monitoredApis = APIS_CONFIG_PLACEHOLDER || \[\];/REPLACE_CONFIG_HERE/g' "$build_file"
+    
+    # 第二步：创建完整的变量定义
+    echo "var monitoredApis = " > build/temp_config.json
+    echo "$apis_config" >> build/temp_config.json
+    echo ";" >> build/temp_config.json
+    
+    # 第三步：插入完整定义并删除占位符
+    sed -i '' "/REPLACE_CONFIG_HERE/r build/temp_config.json" "$build_file"
+    sed -i '' "/REPLACE_CONFIG_HERE/d" "$build_file"
+    rm -f build/temp_config.json
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ JS文件生成成功: ${build_file}${NC}"
+        echo -e "${BLUE}📊 配置注入: $(echo "$apis_config" | grep -c '"description"') 个API${NC}"
+        echo -e "${BLUE}🔧 保持模板的所有完整功能${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ JS文件生成失败${NC}"
+        return 1
     fi
 }
 
@@ -60,10 +139,21 @@ NC='\033[0m' # No Color
 # 加载配置
 load_config
 
+# 设置代理环境变量（如果配置了代理）
+if [ -n "$PROXY_URL" ]; then
+    echo "🌐 设置shell代理环境变量: ${PROXY_URL}"
+    export http_proxy="$PROXY_URL"
+    export https_proxy="$PROXY_URL"
+    export HTTP_PROXY="$PROXY_URL"
+    export HTTPS_PROXY="$PROXY_URL"
+    echo -e "${GREEN}✅ 代理环境变量已设置${NC}"
+fi
+
 echo "🚀 启动Frida隐私监控 v3.6..."
 echo "🎯 目标应用: ${TARGET_PACKAGE}"
-echo "📋 监控脚本: lib/privacy_monitor_ultimate.js v2.2"
-echo "🔧 优化: 使用安全的eval配置解析"
+echo "📋 监控脚本: lib/privacy_monitor_template.js v1.0 (模板化配置版本)"
+echo "📄 配置文件: frida_config.json"
+echo "🔧 优化: 使用JSON统一配置格式"
 echo "📁 日志目录: ${LOG_DIR}"
 if [ -n "$PROXY_URL" ]; then
     echo "🌐 代理地址: ${PROXY_URL}"
@@ -79,31 +169,35 @@ DEPLOY_ACTIONS=()
 function check_network_for_download() {
     echo -e "${BLUE}🔍 检查网络连接（下载需要）...${NC}"
     
-    # 设置代理（如果配置了）
-    local curl_proxy=""
-    local wget_proxy=""
+    # 环境变量已设置代理，无需额外参数
     if [ -n "$PROXY_URL" ]; then
-        curl_proxy="--proxy $PROXY_URL"
-        wget_proxy="--proxy=$PROXY_URL"
-        echo -e "${BLUE}🌐 使用代理: $PROXY_URL${NC}"
+        echo -e "${BLUE}🌐 使用代理: $PROXY_URL（已设置环境变量）${NC}"
     fi
     
     if command -v curl &> /dev/null; then
-        if curl -I --connect-timeout 10 --max-time 15 $curl_proxy https://github.com &> /dev/null; then
+        if curl -I --connect-timeout 10 --max-time 15 https://github.com &> /dev/null; then
             echo -e "${GREEN}✅ 网络连接正常，可访问GitHub${NC}"
             return 0
         else
             echo -e "${RED}❌ 无法访问GitHub，frida-server下载失败${NC}"
-            echo -e "${YELLOW}💡 请检查网络连接或代理设置${NC}"
+            if [ -z "$PROXY_URL" ]; then
+                echo -e "${YELLOW}💡 可能是连接VPN但没有配置代理，请在 ${CONFIG_FILE} 中设置 network.proxyUrl${NC}"
+            else
+                echo -e "${YELLOW}💡 请检查代理设置是否正确: ${PROXY_URL}${NC}"
+            fi
             return 1
         fi
     elif command -v wget &> /dev/null; then
-        if wget --spider --timeout=10 --tries=1 $wget_proxy https://github.com &> /dev/null; then
+        if wget --spider --timeout=10 --tries=1 https://github.com &> /dev/null; then
             echo -e "${GREEN}✅ 网络连接正常，可访问GitHub${NC}"
             return 0
         else
             echo -e "${RED}❌ 无法访问GitHub，frida-server下载失败${NC}"
-            echo -e "${YELLOW}💡 请检查网络连接或代理设置${NC}"
+            if [ -z "$PROXY_URL" ]; then
+                echo -e "${YELLOW}💡 可能是连接VPN但没有配置代理，请在 ${CONFIG_FILE} 中设置 network.proxyUrl${NC}"
+            else
+                echo -e "${YELLOW}💡 请检查代理设置是否正确: ${PROXY_URL}${NC}"
+            fi
             return 1
         fi
     else
@@ -147,13 +241,16 @@ function auto_deploy_frida_server() {
             ;;
     esac
     
-    FRIDA_SERVER_FILE="lib/frida-server-android-${FRIDA_ARCH}"
+    FRIDA_SERVER_FILE="build/frida-server-android-${FRIDA_ARCH}"
     
     # 检查本地是否已有frida-server文件
     if [ -f "$FRIDA_SERVER_FILE" ]; then
         echo -e "${GREEN}✅ 发现本地frida-server文件: ${FRIDA_SERVER_FILE}${NC}"
     else
         echo -e "${YELLOW}📥 需要下载frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}...${NC}"
+        
+        # 确保build目录存在
+        mkdir -p build
         
         # 只在需要下载时检测网络
         if ! check_network_for_download; then
@@ -163,18 +260,10 @@ function auto_deploy_frida_server() {
         # 下载frida-server
         DOWNLOAD_URL="https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}.xz"
         
-        # 设置代理参数
-        local curl_proxy=""
-        local wget_proxy=""
-        if [ -n "$PROXY_URL" ]; then
-            curl_proxy="--proxy $PROXY_URL"
-            wget_proxy="--proxy=$PROXY_URL"
-        fi
-        
         if command -v curl &> /dev/null; then
-            curl -L $curl_proxy -o "frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}.xz" "$DOWNLOAD_URL"
+            curl -L -o "frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}.xz" "$DOWNLOAD_URL"
         elif command -v wget &> /dev/null; then
-            wget $wget_proxy -O "frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}.xz" "$DOWNLOAD_URL"
+            wget -O "frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}.xz" "$DOWNLOAD_URL"
         else
             echo -e "${RED}❌ 未找到curl或wget下载工具${NC}"
             return 1
@@ -182,6 +271,11 @@ function auto_deploy_frida_server() {
         
         if [ $? -ne 0 ]; then
             echo -e "${RED}❌ frida-server下载失败${NC}"
+            if [ -z "$PROXY_URL" ]; then
+                echo -e "${YELLOW}💡 可能是连接VPN但没有配置代理，请在 ${CONFIG_FILE} 中设置 network.proxyUrl${NC}"
+            else
+                echo -e "${YELLOW}💡 请检查代理设置是否正确: ${PROXY_URL}${NC}"
+            fi
             return 1
         fi
         
@@ -288,6 +382,11 @@ if echo "$DEVICE_ID" | grep -q "emulator"; then
 else
     echo -e "${BLUE}📱 检测到物理设备${NC}"
 fi
+
+# 先尝试获取Root权限
+echo -e "${BLUE}🔧 尝试获取Root权限...${NC}"
+adb root >/dev/null 2>&1
+sleep 1
 
 # 检查Root权限
 ROOT_CHECK=$(adb shell "id" 2>/dev/null | grep "uid=0(root)")
@@ -473,15 +572,29 @@ else
     fi
 fi
 
-# 9. 检查监控脚本
-echo -e "\n🔍 [9/9] 检查监控脚本..."
-if [ ! -f "lib/privacy_monitor_ultimate.js" ]; then
-    echo -e "${RED}❌ 错误: 未找到监控脚本 lib/privacy_monitor_ultimate.js${NC}"
-    exit 1
+# 9. 检查监控脚本和配置文件
+echo -e "\n🔍 [9/9] 检查配置文件和脚本模板..."
+
+# 检查模板脚本（现在不是必需的，因为我们会动态生成）
+if [ -f "lib/privacy_monitor_template.js" ]; then
+    SCRIPT_SIZE=$(wc -l < lib/privacy_monitor_template.js)
+    echo -e "${GREEN}✅ 脚本模板已就绪 ${SCRIPT_SIZE} 行代码（可选）${NC}"
 fi
 
-SCRIPT_SIZE=$(wc -l < lib/privacy_monitor_ultimate.js)
-echo -e "${GREEN}✅ 监控脚本已就绪 ${SCRIPT_SIZE} 行代码${NC}"
+# 检查配置文件
+if [ -f "$CONFIG_FILE" ]; then
+    CONFIG_SIZE=$(wc -l < "$CONFIG_FILE")
+    if command -v jq &> /dev/null; then
+        API_COUNT=$(jq '.apis | length' "$CONFIG_FILE" 2>/dev/null || echo "14")
+    else
+        API_COUNT=$(grep -c '"description"' "$CONFIG_FILE" 2>/dev/null || echo "14")
+    fi
+    echo -e "${GREEN}✅ 统一配置文件已就绪 ${CONFIG_SIZE} 行，${API_COUNT} 个API配置${NC}"
+else
+    echo -e "${RED}❌ 错误: 未找到配置文件 $CONFIG_FILE${NC}"
+    echo -e "${YELLOW}💡 无法动态生成监控脚本${NC}"
+    exit 1
+fi
 
 # 智能自动部署处理
 if [ "$AUTO_DEPLOY_NEEDED" = true ]; then
@@ -531,16 +644,23 @@ echo -e "${GREEN}✅ 磁盘空间: 充足${NC}"
 echo -e "${GREEN}✅ frida-server: 运行中${NC}"
 echo -e "${GREEN}✅ Frida连接: 正常${NC}"
 echo -e "${GREEN}✅ 目标应用: ${TARGET_PACKAGE}${NC}"
-echo -e "${GREEN}✅ 监控脚本: lib/privacy_monitor_ultimate.js v2.2${NC}"
+echo -e "${GREEN}✅ 监控脚本: lib/privacy_monitor_template.js v1.0 (模板化配置版本)${NC}"
 echo -e "${GREEN}✅ 配置文件: ${CONFIG_FILE}${NC}"
 if [ "$AUTO_DEPLOY_NEEDED" = true ]; then
     echo -e "${MAGENTA}✅ 自动部署: 已完成${NC}"
 fi
 echo -e "${BLUE}=================================${NC}"
 
+# 生成动态监控脚本
+if ! generate_monitor_script; then
+    echo -e "${RED}❌ JS文件生成失败，无法继续${NC}"
+    exit 1
+fi
+
 echo -e "\n${YELLOW}🚀 即将启动隐私监控...${NC}"
 echo -e "${YELLOW}💡 提示: 按 Ctrl+C 停止监控${NC}"
 echo -e "${YELLOW}🔍 监控范围: 设备标识符、位置、联系人、相机、麦克风等${NC}"
+echo -e "${BLUE}📝 使用生成的监控脚本: build/privacy_monitor_generated.js${NC}"
 echo ""
 
 # 询问用户是否继续
@@ -563,7 +683,7 @@ echo -e "${YELLOW}💡 所有输出将同时保存到日志文件${NC}"
 echo ""
 
 # 使用tee命令同时输出到控制台和文件
-frida -U -l lib/privacy_monitor_ultimate.js -f "$TARGET_PACKAGE" 2>&1 | tee "$LOG_FILE"
+frida -U -l build/privacy_monitor_generated.js -f "$TARGET_PACKAGE" 2>&1 | tee "$LOG_FILE"
 
 # 监控结束后的提示
 echo ""

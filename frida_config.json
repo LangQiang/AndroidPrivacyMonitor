@@ -1,0 +1,149 @@
+{
+  "version": "3.6",
+  "description": "Android隐私API监控统一配置文件",
+  "author": "GodQ",
+  "monitor": {
+    "targetPackage": "com.frog.educate",
+    "logDir": "./logs",
+    "logPrefix": "frida_log",
+    "autoExtractStacks": true
+  },
+  "network": {
+    "proxyUrl": "http://127.0.0.1:7897"
+  },
+  "apis": [
+    {
+      "description": "序列号监控",
+      "className": "android.os.Build",
+      "methodName": "getSerial",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取设备序列号",
+      "relatedFields": ["SERIAL"]
+    },
+    {
+      "description": "Android ID监控", 
+      "className": "android.provider.Settings$Secure",
+      "methodName": "getString",
+      "overloads": ["android.content.ContentResolver", "java.lang.String"],
+      "condition": "args[1] === 'android_id'",
+      "logMessage": "获取设备唯一标识",
+      "relatedFields": []
+    },
+    {
+      "description": "IMEI监控",
+      "className": "android.telephony.TelephonyManager", 
+      "methodName": "getDeviceId",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取设备IMEI",
+      "relatedFields": []
+    },
+    {
+      "description": "MAC地址监控",
+      "className": "android.net.wifi.WifiInfo",
+      "methodName": "getMacAddress",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取设备MAC地址",
+      "relatedFields": []
+    },
+    {
+      "description": "位置信息监控",
+      "className": "android.location.LocationManager",
+      "methodName": "getLastKnownLocation",
+      "overloads": ["java.lang.String"],
+      "condition": null,
+      "logMessage": "获取最后已知位置",
+      "relatedFields": []
+    },
+    {
+      "description": "应用列表监控",
+      "className": "android.content.pm.PackageManager",
+      "methodName": "getInstalledPackages",
+      "overloads": ["int"],
+      "condition": null,
+      "logMessage": "获取已安装应用列表",
+      "relatedFields": []
+    },
+    {
+      "description": "联系人查询监控",
+      "className": "android.content.ContentResolver",
+      "methodName": "query",
+      "overloads": ["android.net.Uri", "[Ljava.lang.String;", "java.lang.String", "[Ljava.lang.String;", "java.lang.String"],
+      "condition": "args[0] && (args[0].toString().includes('contacts') || args[0].toString().includes('phone'))",
+      "logMessage": "查询联系人信息",
+      "relatedFields": []
+    },
+    {
+      "description": "剪贴板监控",
+      "className": "android.content.ClipboardManager",
+      "methodName": "getPrimaryClip",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "读取剪贴板内容",
+      "relatedFields": []
+    },
+    {
+      "description": "SIM卡IMSI监控",
+      "className": "android.telephony.TelephonyManager",
+      "methodName": "getSubscriberId",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取SIM卡IMSI",
+      "relatedFields": []
+    },
+    {
+      "description": "SIM卡序列号监控",
+      "className": "android.telephony.TelephonyManager",
+      "methodName": "getSimSerialNumber",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取SIM卡序列号",
+      "relatedFields": []
+    },
+    {
+      "description": "手机号码监控",
+      "className": "android.telephony.TelephonyManager",
+      "methodName": "getLine1Number",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取手机号码",
+      "relatedFields": []
+    },
+    {
+      "description": "相机监控",
+      "className": "android.hardware.Camera",
+      "methodName": "open",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "打开相机",
+      "relatedFields": []
+    },
+    {
+      "description": "音频录制监控",
+      "className": "android.media.AudioRecord",
+      "methodName": "$init",
+      "overloads": ["int", "int", "int", "int", "int"],
+      "condition": null,
+      "logMessage": "初始化音频录制",
+      "relatedFields": []
+    },
+    {
+      "description": "WiFi连接信息监控",
+      "className": "android.net.wifi.WifiManager",
+      "methodName": "getConnectionInfo",
+      "overloads": [],
+      "condition": null,
+      "logMessage": "获取WiFi连接信息",
+      "relatedFields": []
+    }
+  ],
+  "settings": {
+    "enableLifecycleMonitor": true,
+    "enableReflectionMonitor": true,
+    "enableStackTrace": true,
+    "maxStackDepth": 10,
+    "logLevel": "INFO"
+  }
+} 
