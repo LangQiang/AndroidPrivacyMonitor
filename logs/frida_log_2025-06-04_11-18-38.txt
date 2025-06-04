@@ -1,0 +1,112 @@
+     ____
+    / _  |   Frida 17.0.7 - A world-class dynamic instrumentation toolkit
+   | (_| |
+    > _  |   Commands:
+   /_/ |_|       help      -> Displays the help system
+   . . . .       object?   -> Display information about 'object'
+   . . . .       exit/quit -> Exit
+   . . . .
+   . . . .   More info at https://frida.re/docs/home/
+   . . . .
+   . . . .   Connected to Android Emulator 5554 (id=emulator-5554)
+Spawning `com.frog.educate`...
+Spawned `com.frog.educate`. Resuming main thread!
+[Android Emulator 5554::com.frog.educate ]-> 🔍 Frida隐私监控系统启动...
+🎯 目标应用: com.frog.educate
+📅 启动时间: 06/04/2025, 11:18:35 AM
+🔖 版本: Ultimate v2.2 (增加堆栈文件输出功能)
+NaN
+📁 日志文件: ./logs/20250604111835.txt
+✅ ContentProvider生命周期监控已设置
+✅ Application生命周期监控已设置
+✅ Android ID - Hook设置成功
+✅ IMEI - Hook设置成功
+✅ MAC地址 - Hook设置成功
+📋 当前Build.SERIAL值: unknown
+✅ 序列号 - Hook设置成功
+✅ SIM卡信息 - Hook设置成功
+✅ 位置信息 - Hook设置成功
+✅ 应用列表 - Hook设置成功
+✅ 联系人 - Hook设置成功
+✅ 相机 - Hook设置成功
+✅ 麦克风 - Hook设置成功
+✅ 剪贴板 - Hook设置成功
+✅ 通用Flutter监控已启用（通过Build.getSerial()直接监控）
+✅ Flutter插件 - Hook设置成功
+✅ 安全异常 - Hook设置成功
+✅ 反射监控 - Hook设置成功
+
+🏗️ [生命周期] Application构造函数被调用
+⏰ 时间: 11:18:035.840
+
+🚀 [生命周期] Application.onCreate()被调用
+⏰ 时间: 11:18:035.847
+
+📊 Hook设置完成统计:
+✅ Android ID
+✅ IMEI
+✅ MAC地址
+✅ 序列号
+✅ SIM卡信息
+✅ 位置信息
+✅ 应用列表
+✅ 联系人
+✅ 相机
+✅ 麦克风
+✅ 剪贴板
+✅ Flutter插件
+✅ 安全异常
+✅ 反射监控
+
+🎯 监控设置完成!
+✅ 成功: 14 个
+❌ 失败: 0 个
+📱 成功率: 100%
+🔍 开始监控隐私API调用...
+NaN
+
+🔒 [安全异常] SecurityException被创建!
+📋 异常消息: getSerial: The uid 10196 does not meet the requirements to access device identifiers.
+⏰ 时间: 06/04/2025, 11:18:36 AM
+💡 这可能与隐私API调用相关
+🔒 SecurityException被捕获，将返回Build.UNKNOWN
+
+🚨 [1] [11:18:036.933] 序列号获取(异常)
+⏰ 调用时机: 📱 正常调用 (Application.onCreate()后)
+📋 API: Build.getSerial
+📝 详情: SecurityException: Error: java.lang.SecurityException: getSerial: The uid 10196 does not meet the requirements to access device identifiers.
+📤 返回值: unknown
+📍 调用堆栈:
+===== STACK_START =====
+   java.lang.Exception
+   at android.os.Build.getSerial(Native Method)
+   at e2.b.a(Unknown Source:0)
+   at e2.c.onMethodCall(Unknown Source:393)
+   at w2.k$a.a(Unknown Source:17)
+   at k2.c.l(Unknown Source:18)
+   at k2.c.m(Unknown Source:41)
+   at k2.c.i(Unknown Source:0)
+   at k2.b.run(Unknown Source:12)
+   at android.os.Handler.handleCallback(Handler.java:958)
+===== STACK_END =====
+NaN
+
+🚨 [2] [11:18:037.010] Android ID获取
+⏰ 调用时机: 📱 正常调用 (Application.onCreate()后)
+📋 API: Settings.Secure.getString
+📝 详情: 获取设备唯一标识
+📤 返回值: ba44af50580c13ed
+📍 调用堆栈:
+===== STACK_START =====
+   java.lang.Exception
+   at android.provider.Settings$Secure.getString(Native Method)
+   at com.umeng.commonsdk.statistics.common.DeviceConfig.getAndroidId(Unknown Source:48)
+   at java.lang.reflect.Method.invoke(Native Method)
+   at java.lang.reflect.Method.invoke(Native Method)
+   at com.umeng.umzid.d.a(Unknown Source:27)
+   at com.umeng.umzid.ZIDManager.a(Unknown Source:13)
+   at com.umeng.umzid.ZIDManager.b(Unknown Source:164)
+   at com.umeng.umzid.ZIDManager$b.run(Unknown Source:4)
+   at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:487)
+===== STACK_END =====
+NaN
