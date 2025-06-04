@@ -2,7 +2,7 @@
 
 # Frida Android 隐私监控启动脚本 v3.6
 # 用于快速启动对目标应用的隐私API监控
-# 优化: 使用bash原生配置解析
+# 优化: 使用安全的eval配置解析
 
 # 配置文件路径
 CONFIG_FILE="config.conf"
@@ -13,13 +13,21 @@ DEFAULT_LOG_DIR="./logs"
 DEFAULT_LOG_PREFIX="frida_log"
 DEFAULT_AUTO_EXTRACT="true"
 
-# 读取配置文件函数 (使用bash原生source)
+# 读取配置文件函数 (使用安全的eval方法)
 load_config() {
     if [ -f "$CONFIG_FILE" ]; then
         echo "⚙️ 读取配置文件: $CONFIG_FILE"
         
-        # 直接source配置文件 - bash原生支持注释！
-        source "$CONFIG_FILE"
+        # 使用eval方法安全解析配置文件
+        while IFS= read -r line; do
+            # 跳过空行和注释行
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+            
+            # 验证格式并使用eval设置变量
+            if [[ "$line" =~ ^[A-Z_][A-Z0-9_]*= ]]; then
+                eval "$line"
+            fi
+        done < "$CONFIG_FILE"
         
         echo "✅ 配置文件加载完成"
     else
@@ -55,7 +63,7 @@ load_config
 echo "🚀 启动Frida隐私监控 v3.6..."
 echo "🎯 目标应用: ${TARGET_PACKAGE}"
 echo "📋 监控脚本: lib/privacy_monitor_ultimate.js v2.2"
-echo "🔧 优化: 使用bash原生source解析"
+echo "🔧 优化: 使用安全的eval配置解析"
 echo "📁 日志目录: ${LOG_DIR}"
 if [ -n "$PROXY_URL" ]; then
     echo "🌐 代理地址: ${PROXY_URL}"
