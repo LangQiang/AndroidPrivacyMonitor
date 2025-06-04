@@ -8,7 +8,6 @@
 CONFIG_FILE="frida_config.json"
 
 # 默认配置
-DEFAULT_TARGET_PACKAGE="com.frog.educate"
 DEFAULT_LOG_DIR="./logs"
 DEFAULT_LOG_PREFIX="frida_log"
 DEFAULT_AUTO_EXTRACT="true"
@@ -20,7 +19,7 @@ load_config() {
         
         # 使用jq解析JSON配置文件
         if command -v jq &> /dev/null; then
-            TARGET_PACKAGE=$(jq -r '.monitor.targetPackage // "com.frog.educate"' "$CONFIG_FILE")
+            TARGET_PACKAGE=$(jq -r '.monitor.targetPackage // empty' "$CONFIG_FILE")
             LOG_DIR=$(jq -r '.monitor.logDir // "./logs"' "$CONFIG_FILE")
             LOG_PREFIX=$(jq -r '.monitor.logPrefix // "frida_log"' "$CONFIG_FILE")
             AUTO_EXTRACT_STACKS=$(jq -r '.monitor.autoExtractStacks // true' "$CONFIG_FILE")
@@ -37,19 +36,22 @@ load_config() {
         
         echo "✅ JSON配置文件加载完成"
     else
-        echo "⚠️ 未找到配置文件 $CONFIG_FILE，使用默认配置"
+        echo "❌ 错误: 未找到配置文件 $CONFIG_FILE"
+        echo "💡 请先创建配置文件，包含必要的 monitor.targetPackage 配置"
+        exit 1
     fi
     
     # 设置默认值（如果配置文件中没有设置）
-    TARGET_PACKAGE="${TARGET_PACKAGE:-$DEFAULT_TARGET_PACKAGE}"
     LOG_DIR="${LOG_DIR:-$DEFAULT_LOG_DIR}"
     LOG_PREFIX="${LOG_PREFIX:-$DEFAULT_LOG_PREFIX}"
     AUTO_EXTRACT_STACKS="${AUTO_EXTRACT_STACKS:-$DEFAULT_AUTO_EXTRACT}"
     
     # 验证必填项
-    if [ -z "$TARGET_PACKAGE" ]; then
+    if [ -z "$TARGET_PACKAGE" ] || [ "$TARGET_PACKAGE" = "null" ]; then
         echo "❌ 错误: 目标应用包名不能为空"
         echo "💡 请在 $CONFIG_FILE 中设置 monitor.targetPackage"
+        echo "📝 配置示例:"
+        echo "   {\"monitor\": {\"targetPackage\": \"com.example.app\"}}"
         exit 1
     fi
 }
