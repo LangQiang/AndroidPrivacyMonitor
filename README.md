@@ -79,6 +79,63 @@ adb shell "whoami"
 - **离线使用**: 如已有frida-server文件，可离线运行
 - **代理支持**: 支持通过配置文件设置代理
 
+## 🚀 第一点五部分：快速环境搭建
+
+### 🎯 一键搭建（推荐）
+如果您在全新电脑上搭建环境，只需运行：
+```bash
+./tools/setup_frida_environment.sh
+```
+
+### 🔧 脚本自动完成的任务
+1. **环境检测** 🔍 - 检查操作系统、Python3、pip3、下载工具、解压工具
+2. **Android环境检查** 📱 - 检查ADB、设备连接、设备架构  
+3. **Frida工具安装** ⚙️ - 安装/升级frida-tools、获取版本信息
+4. **frida-server下载** 📥 - 自动构建下载URL、下载对应版本、解压重命名
+5. **设备部署** 🚀 - 推送到设备、设置权限、启动服务
+6. **环境验证** ✅ - 测试Frida连接、显示进程列表、验证完整性
+
+### 🛠️ 手动搭建步骤（备用）
+如果自动脚本失败，可手动执行：
+
+#### 1. 安装基础工具
+```bash
+# macOS
+brew install python3 android-platform-tools xz
+
+# Ubuntu/Debian  
+sudo apt-get install python3 python3-pip android-tools-adb xz-utils
+
+# CentOS/RHEL
+sudo yum install python3 python3-pip android-tools xz
+```
+
+#### 2. 安装Frida并部署
+```bash
+# 安装Frida
+pip3 install frida-tools
+
+# 获取版本并下载frida-server
+FRIDA_VERSION=$(frida --version)
+curl -L -o frida-server-${FRIDA_VERSION}-android-arm64.xz \
+  https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/frida-server-${FRIDA_VERSION}-android-arm64.xz
+
+# 解压并部署
+unxz frida-server-${FRIDA_VERSION}-android-arm64.xz
+mv frida-server-${FRIDA_VERSION}-android-arm64 frida-server-android-arm64
+adb push frida-server-android-arm64 /data/local/tmp/frida-server
+adb shell chmod 755 /data/local/tmp/frida-server
+adb shell "/data/local/tmp/frida-server &"
+
+# 验证环境
+frida-ps -U
+```
+
+### 🔧 常见问题解决
+- **下载失败**: 检查网络连接，可设置代理 `export https_proxy=http://your-proxy:port`
+- **权限问题**: 确保设备Root权限 `adb shell su -c "whoami"`
+- **架构不匹配**: 检查设备架构 `adb shell getprop ro.product.cpu.abi` 并下载对应版本
+
 ## 🚀 第二部分：项目功能
 
 ### 🎯 核心功能
@@ -134,10 +191,10 @@ adb shell "whoami"
 - **版本兼容**: 支持不同版本的目标应用
 
 #### 配置参数
-- **监控脚本**: `lib/privacy_monitor_ultimate.js`
-- **配置文件**: `config.conf` 🆕
+- **监控脚本**: `lib/privacy_monitor_template.js`
+- **配置文件**: `frida_config.json`
 - **frida-server**: 自动选择对应架构版本
-- **日志目录**: 可配置 (默认: `./logs/`)
+- **日志目录**: 可配置 (默认: `./build/logs/`)
 
 ### 📤 输出
 
@@ -176,85 +233,116 @@ adb shell "whoami"
 ```
 frida/
 ├── start_monitor.sh              # 🚀 主启动脚本 (v3.6)
-├── config.conf                   # ⚙️ 配置文件 🆕
+├── frida_config.json             # ⚙️ 项目配置文件
+├── tools/                        # 🛠️ 工具目录
+│   └── setup_frida_environment.sh   # 一键环境配置脚本
 ├── lib/                          # 📚 库文件目录
-│   ├── privacy_monitor_ultimate.js  # 核心监控脚本
-│   ├── extract_stacks.sh            # 堆栈提取工具
-│   └── frida-server-android-arm64   # Frida服务端程序
-├── logs/                         # 📁 日志输出目录
-│   ├── frida_log_2025-06-04_12-01-20.txt
-│   └── frida_log_2025-06-04_12-01-20_stacks_only.txt
-├── docs/                         # 📚 文档目录
-│   ├── SETUP_GUIDE.md                # 详细搭建指南
-│   └── setup_frida_environment.sh    # 一键环境配置
-└── README.md                     # 项目说明文档
+│   ├── privacy_monitor_template.js  # 监控脚本模板
+│   └── extract_stacks.sh            # 堆栈提取工具
+├── build/                        # 🔨 构建和运行目录
+│   ├── privacy_monitor_generated.js # 生成的监控脚本
+│   ├── frida-server-android-arm64   # Frida服务端程序
+│   └── logs/                         # 📁 日志输出目录
+│       ├── frida_log_YYYY-MM-DD_HH-MM-SS.txt
+│       └── frida_log_YYYY-MM-DD_HH-MM-SS_stacks_only.txt
+├── .gitignore                    # Git忽略文件配置
+└── README.md                     # 📖 项目说明文档（本文件）
 ```
 
 ## ⚙️ 第五部分：配置文件
 
-### 📝 配置文件格式 (config.conf)
+### 📝 配置文件格式 (frida_config.json)
 
-```bash
-# Frida Android 隐私监控工具配置文件
-# 作者: GodQ
-# 版本: v3.6
-# 格式: key=value (不要有空格)
+项目使用JSON格式的配置文件，包含监控目标、网络设置、API配置等：
 
-# 目标应用包名 (必填)
-TARGET_PACKAGE=com.frog.educate
-
-# 日志输出路径 (可选，默认: ./logs)
-LOG_DIR=./logs
-
-# 代理地址 (可选，用于下载frida-server)
-# 格式示例: http://proxy.company.com:8080
-# 留空表示不使用代理
-PROXY_URL=
-
-# 其他可选配置
-# 日志文件前缀 (可选，默认: frida_log)
-LOG_PREFIX=frida_log
-
-# 是否自动提取堆栈信息 (可选，默认: true)
-AUTO_EXTRACT_STACKS=true
+```json
+{
+  "version": "3.6",
+  "description": "Android隐私API监控统一配置文件",
+  "monitor": {
+    "targetPackage": "com.frog.educate",
+    "logDir": "./logs",
+    "logPrefix": "privacy_log",
+    "autoExtractStacks": true
+  },
+  "network": {
+    "proxyUrl": "http://127.0.0.1:7897"
+  },
+  "settings": {
+    "enableLifecycleMonitor": true,
+    "enableReflectionMonitor": true,
+    "enableStackTrace": true,
+    "maxStackDepth": 10,
+    "logLevel": "INFO"
+  },
+  "apis": [
+    {
+      "description": "序列号监控",
+      "className": "android.os.Build",
+      "methodName": "getSerial",
+      "overloads": [[]],
+      "condition": null,
+      "logMessage": "获取设备序列号",
+      "relatedFields": ["SERIAL"]
+    }
+    // ... 包含15个常用隐私API监控配置
+  ]
+}
 ```
 
 ### 🔧 主要配置项
 
-#### 目标应用配置
-```bash
-# 修改目标应用包名
-TARGET_PACKAGE=com.your.app
+#### 监控配置 (monitor)
+```json
+{
+  "monitor": {
+    "targetPackage": "com.your.app",        // 目标应用包名
+    "logDir": "./build/logs",               // 日志输出目录
+    "logPrefix": "my_app_log",              // 日志文件前缀
+    "autoExtractStacks": true               // 是否自动提取堆栈
+  }
+}
 ```
 
-#### 日志配置
-```bash
-# 自定义日志目录
-LOG_DIR=./custom_logs
-
-# 自定义文件前缀
-LOG_PREFIX=my_log
-
-# 禁用自动堆栈提取
-AUTO_EXTRACT_STACKS=false
+#### 网络配置 (network)
+```json
+{
+  "network": {
+    "proxyUrl": "http://proxy.company.com:8080"  // 代理地址（用于下载frida-server）
+  }
+}
 ```
 
-#### 网络配置
-```bash
-# 设置代理（用于下载frida-server）
-PROXY_URL=http://proxy.company.com:8080
-
-# 或者使用SOCKS代理
-PROXY_URL=socks5://127.0.0.1:1080
+#### 高级设置 (settings)
+```json
+{
+  "settings": {
+    "enableLifecycleMonitor": true,         // 启用生命周期监控
+    "enableReflectionMonitor": true,        // 启用反射调用监控
+    "enableStackTrace": true,               // 启用堆栈跟踪
+    "maxStackDepth": 10,                    // 最大堆栈深度
+    "logLevel": "INFO"                      // 日志级别 (DEBUG/INFO/WARN/ERROR)
+  }
+}
 ```
 
-### 🆕 配置文件优势
+#### API监控配置 (apis)
+每个API监控项包含：
+- **description**: 监控描述
+- **className**: Java类名
+- **methodName**: 方法名
+- **overloads**: 方法重载签名
+- **condition**: 触发条件（可选）
+- **logMessage**: 日志消息
+- **relatedFields**: 相关字段（可选）
 
-- **安全性强**: 使用eval方法，只解析符合格式的配置行
-- **注释友好**: 支持#注释，便于理解
-- **容错性强**: 缺失配置项自动使用默认值
-- **跨平台**: 所有系统都支持，无依赖
-- **环境隔离**: 避免source方法的环境污染问题
+### 🆕 JSON配置优势
+
+- **结构化强**: 清晰的层次结构，易于理解和维护
+- **类型安全**: 支持字符串、布尔值、数组等多种数据类型
+- **扩展性强**: 易于添加新的配置项和API监控规则
+- **工具支持**: 支持JSON编辑器的语法高亮和格式化
+- **验证友好**: 可以使用JSON Schema进行配置验证
 
 ## 🚀 第六部分：快速开始
 
@@ -268,7 +356,7 @@ cd frida
 ```
 
 ### 启动流程
-1. **配置文件检查** (检查config.conf，使用安全eval解析)
+1. **配置文件检查** (检查frida_config.json，使用JSON解析)
 2. **环境检测** (9步验证)
 3. **自动部署** (如需要)
 4. **应用监控** (实时Hook)
@@ -284,10 +372,10 @@ cd frida
 按 Ctrl+C
 
 # 查看日志
-ls logs/
+ls build/logs/
 
 # 分析堆栈
-cat logs/*_stacks_only.txt
+cat build/logs/*_stacks_only.txt
 ```
 
 ## 🔧 第七部分：高级配置
@@ -295,29 +383,29 @@ cat logs/*_stacks_only.txt
 ### 修改目标应用
 ```bash
 # 编辑配置文件
-vim config.conf
-# 修改: TARGET_PACKAGE=com.your.app
+vim frida_config.json
+# 修改: "targetPackage": "com.your.app"
 ```
 
 ### 设置代理
 ```bash
 # 编辑配置文件
-vim config.conf
-# 添加: PROXY_URL=http://proxy.company.com:8080
+vim frida_config.json
+# 修改: "proxyUrl": "http://proxy.company.com:8080"
 ```
 
 ### 自定义日志
 ```bash
 # 编辑配置文件
-vim config.conf
-# 修改: LOG_DIR=./my_logs
-# 修改: LOG_PREFIX=my_app_log
+vim frida_config.json
+# 修改: "logDir": "./my_logs"
+# 修改: "logPrefix": "my_app_log"
 ```
 
 ### 环境问题排查
 ```bash
 # 检查配置文件
-cat config.conf
+cat frida_config.json
 
 # 检查Frida版本
 frida --version
@@ -385,7 +473,7 @@ adb shell "/data/local/tmp/frida-server &"
 - Frida版本
 - 设备类型和Android版本
 - 完整的错误日志
-- 配置文件内容
+- 配置文件内容 (frida_config.json)
 
 ---
 
