@@ -106,6 +106,33 @@ adb shell "whoami"
 
 ## 🚀 快速开始
 
+### 🔐 首次使用 - 权限设置
+
+**⚠️ 重要：首次下载项目后，请根据您的操作系统设置执行权限**
+
+| 操作系统 | 权限设置命令 | 说明 |
+|---------|-------------|------|
+| 🐧 **Linux** | `chmod +x start_monitor_linux.sh lib/start_monitor.sh` | 必须设置 |
+| 🍎 **macOS** | `chmod +x start_monitor.command lib/start_monitor.sh` | 必须设置 |
+| 🪟 **Windows** | 无需设置权限 | 直接双击使用 |
+
+**🔧 一键权限修复（Linux/macOS）**：
+```bash
+# ⚠️ 重要：请先确保在项目根目录中执行（包含frida_config.json的目录）
+pwd                    # 检查当前目录
+ls frida_config.json   # 确认项目目录正确
+
+# 批量修复所有shell脚本权限
+find . -name "*.sh" -type f -exec chmod +x {} \;
+```
+
+**💡 权限问题诊断**：
+```bash
+# 如果遇到 "Permission denied" 错误
+ls -la start_monitor*              # 查看权限状态
+chmod +x start_monitor_linux.sh   # 手动修复权限
+```
+
 ### 🎯 方式一：一键双击启动（推荐新手）
 
 根据你的操作系统，直接双击对应的启动器：
