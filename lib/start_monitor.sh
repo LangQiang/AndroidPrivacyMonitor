@@ -4,12 +4,29 @@
 # 用于快速启动对目标应用的隐私API监控
 # 优化: 使用安全的eval配置解析，配置化监控脚本
 
+# 智能路径检测 - 自动找到项目根目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+echo "🔍 智能路径检测..."
+echo "📂 脚本位置: $SCRIPT_DIR"
+echo "📂 项目根目录: $PROJECT_ROOT"
+
+# 切换到项目根目录
+cd "$PROJECT_ROOT" || {
+    echo "❌ 错误: 无法切换到项目根目录: $PROJECT_ROOT"
+    exit 1
+}
+
+echo "✅ 工作目录已设置为: $(pwd)"
+echo ""
+
 # 配置文件路径
 CONFIG_FILE="frida_config.json"
 
 # 默认配置
-DEFAULT_LOG_DIR="./logs"
-DEFAULT_LOG_PREFIX="frida_log"
+DEFAULT_LOG_DIR="./build/logs"
+DEFAULT_LOG_PREFIX="privacy_log"
 DEFAULT_AUTO_EXTRACT="true"
 
 # 读取JSON配置文件函数
@@ -20,8 +37,8 @@ load_config() {
         # 使用jq解析JSON配置文件
         if command -v jq &> /dev/null; then
             TARGET_PACKAGE=$(jq -r '.monitor.targetPackage // empty' "$CONFIG_FILE")
-            LOG_DIR=$(jq -r '.monitor.logDir // "./logs"' "$CONFIG_FILE")
-            LOG_PREFIX=$(jq -r '.monitor.logPrefix // "frida_log"' "$CONFIG_FILE")
+            LOG_DIR=$(jq -r '.monitor.logDir // "./build/logs"' "$CONFIG_FILE")
+            LOG_PREFIX=$(jq -r '.monitor.logPrefix // "privacy_log"' "$CONFIG_FILE")
             AUTO_EXTRACT_STACKS=$(jq -r '.monitor.autoExtractStacks // true' "$CONFIG_FILE")
             PROXY_URL=$(jq -r '.network.proxyUrl // ""' "$CONFIG_FILE")
         else
@@ -153,7 +170,7 @@ fi
 
 echo "🚀 启动Frida隐私监控 v3.6..."
 echo "🎯 目标应用: ${TARGET_PACKAGE}"
-echo "📋 监控脚本: lib/privacy_monitor_template.js v1.0 (模板化配置版本)"
+echo "📋 监控脚本: privacy_monitor_template.js v1.0 (模板化配置版本)"
 echo "📄 配置文件: frida_config.json"
 echo "🔧 优化: 使用JSON统一配置格式"
 echo "📁 日志目录: ${LOG_DIR}"
@@ -577,7 +594,7 @@ fi
 # 9. 检查监控脚本和配置文件
 echo -e "\n🔍 [9/9] 检查配置文件和脚本模板..."
 
-# 检查模板脚本（现在不是必需的，因为我们会动态生成）
+# 检查脚本文件
 if [ -f "lib/privacy_monitor_template.js" ]; then
     SCRIPT_SIZE=$(wc -l < lib/privacy_monitor_template.js)
     echo -e "${GREEN}✅ 脚本模板已就绪 ${SCRIPT_SIZE} 行代码（可选）${NC}"
@@ -646,7 +663,7 @@ echo -e "${GREEN}✅ 磁盘空间: 充足${NC}"
 echo -e "${GREEN}✅ frida-server: 运行中${NC}"
 echo -e "${GREEN}✅ Frida连接: 正常${NC}"
 echo -e "${GREEN}✅ 目标应用: ${TARGET_PACKAGE}${NC}"
-echo -e "${GREEN}✅ 监控脚本: lib/privacy_monitor_template.js v1.0 (模板化配置版本)${NC}"
+echo -e "${GREEN}✅ 监控脚本: privacy_monitor_template.js v1.0 (模板化配置版本)${NC}"
 echo -e "${GREEN}✅ 配置文件: ${CONFIG_FILE}${NC}"
 if [ "$AUTO_DEPLOY_NEEDED" = true ]; then
     echo -e "${MAGENTA}✅ 自动部署: 已完成${NC}"
@@ -694,8 +711,7 @@ echo -e "${BLUE}📁 日志文件已保存到: ${LOG_FILE}${NC}"
 
 # 检查是否自动提取堆栈
 if [ "$AUTO_EXTRACT_STACKS" = "true" ]; then
-    echo ""
-    echo -e "${YELLOW}🔍 自动提取堆栈信息...${NC}"
+    echo -e "\n${BLUE}🔍 自动提取堆栈信息...${NC}"
     if [ -f "./lib/extract_stacks.sh" ]; then
         ./lib/extract_stacks.sh "$LOG_FILE"
         echo -e "${GREEN}✅ 堆栈信息提取完成${NC}"

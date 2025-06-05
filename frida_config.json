@@ -3,7 +3,7 @@
   "description": "Android隐私API监控统一配置文件",
   "monitor": {
     "targetPackage": "com.frog.educate",
-    "logDir": "./logs",
+    "logDir": "./build/logs",
     "logPrefix": "privacy_log",
     "autoExtractStacks": true
   },
@@ -142,15 +142,6 @@
       "overloads": [[]],
       "condition": null,
       "logMessage": "获取WiFi连接信息",
-      "relatedFields": []
-    },
-    {
-      "description": "系统服务获取监控",
-      "className": "android.content.Context",
-      "methodName": "getSystemService",
-      "overloads": [["java.lang.String"], ["java.lang.Class"]],
-      "condition": null,
-      "logMessage": "获取系统服务",
       "relatedFields": []
     }
   ]
