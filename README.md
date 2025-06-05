@@ -25,7 +25,6 @@
 - [高级功能](#-高级功能)
 - [故障排除](#-故障排除)
 - [更新日志](#-更新日志)
-- [技术架构](#-技术架构)
 
 ---
 
@@ -119,10 +118,7 @@ adb shell "whoami"
 **🔧 一键权限修复（Linux/macOS）**：
 ```bash
 # ⚠️ 重要：请先确保在项目根目录中执行（包含frida_config.json的目录）
-pwd                    # 检查当前目录
-ls frida_config.json   # 确认项目目录正确
-
-# 批量修复所有shell脚本权限
+# 批量修复当前目录以及子目录中所有shell脚本权限
 find . -name "*.sh" -type f -exec chmod +x {} \;
 ```
 
@@ -568,19 +564,7 @@ build/logs/
 📋 调用位置: android.telephony.TelephonyManager.getDeviceId
 ```
 
-### 📊 调用统计分析
 
-```
-📈 [统计分析] 隐私API调用统计 (运行时间: 2分35秒)
-┌─────────────────────┬─────────┬─────────┐
-│ API类型             │ 调用次数 │ 首次调用 │
-├─────────────────────┼─────────┼─────────┤
-│ Android ID          │ 3       │ 启动后  │
-│ MAC地址             │ 1       │ 启动后  │ 
-│ 应用列表            │ 2       │ 启动后  │
-│ WiFi信息            │ 5       │ 启动后  │
-└─────────────────────┴─────────┴─────────┘
-```
 
 ---
 
@@ -734,97 +718,7 @@ export FRIDA_DEBUG=1
 
 ### 📋 历史版本
 
----
 
-## 🏗️ 技术架构
-
-### 📁 项目结构
-
-```
-frida/
-├── 🚀 启动器文件
-│   ├── start_monitor.bat              # Windows双击启动器
-│   ├── start_monitor.command          # macOS双击启动器
-│   └── start_monitor_linux.sh         # Linux双击启动器
-├── 📋 配置和文档
-│   ├── frida_config.json              # 主配置文件
-│   ├── README.md                      # 项目说明
-│   └── 启动器使用说明.md              # 启动器使用指南
-├── 📚 核心库 (lib/)
-│   ├── start_monitor.sh               # 主启动脚本(智能路径检测)
-│   ├── privacy_monitor_template.js    # Frida监控脚本模板
-│   └── extract_stacks.sh              # 堆栈信息提取工具
-├── 🔧 工具目录 (tools/)
-│   └── setup_frida_environment.sh     # 环境搭建脚本
-└── 📊 构建输出 (build/)
-    ├── privacy_monitor_generated.js   # 动态生成的监控脚本
-    ├── frida-server-android-arm64     # frida-server可执行文件
-    └── logs/                          # 监控日志目录
-        ├── privacy_log_*.txt          # 完整监控日志
-        └── privacy_log_*_stacks_only.txt  # 纯堆栈信息
-```
-
-### 🔄 工作流程
-
-```mermaid
-graph TD
-    A[用户启动] --> B{选择启动方式}
-    B -->|双击启动器| C[平台检测]
-    B -->|命令行| D[智能路径检测]
-    
-    C --> E[环境检测9步]
-    D --> E
-    
-    E --> F{环境完整?}
-    F -->|否| G[自动部署]
-    F -->|是| H[配置解析]
-    
-    G --> H
-    H --> I[动态脚本生成]
-    I --> J[启动Frida监控]
-    
-    J --> K[应用生命周期监控]
-    K --> L[API调用拦截]
-    L --> M[实时日志输出]
-    M --> N[自动堆栈提取]
-```
-
-### ⚙️ 核心技术
-
-#### 🔧 Frida Hook技术
-- **方法拦截**: 使用 `Java.use()` 和 `implementation` 拦截Java方法
-- **字段访问**: 监控静态字段和实例字段访问
-- **构造函数**: Hook类的构造函数监控对象创建
-- **异常处理**: try-catch机制捕获和分析异常
-
-#### 📊 数据采集技术
-- **参数解析**: 自动解析方法参数类型和值
-- **返回值捕获**: 记录方法返回值
-- **堆栈跟踪**: `Java.use("java.lang.Exception").$new().getStackTrace()`
-- **时间戳**: 精确到毫秒的调用时间记录
-
-#### 🤖 智能化技术
-- **环境检测**: Shell脚本+条件判断实现9步检测
-- **路径解析**: `BASH_SOURCE` + `dirname` 实现智能路径定位
-- **配置解析**: JSON.parse + 模板替换实现动态脚本生成
-- **错误恢复**: 自动重试+用户引导实现故障自愈
-
-### 🔒 安全特性
-
-#### 🛡️ 权限检查
-- Root权限验证
-- USB调试确认
-- frida-server权限设置
-
-#### 🔐 数据保护
-- 本地日志存储
-- 敏感信息脱敏
-- 配置文件验证
-
-#### 🚨 异常处理
-- 全面的try-catch覆盖
-- 详细的错误提示
-- 优雅的降级处理
 
 ---
 
